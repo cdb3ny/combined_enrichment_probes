@@ -1,0 +1,183 @@
+#############
+##SET UP#####
+#############
+
+##downloaded the angiosperm baits 
+wget https://github.com/mossmatters/Angiosperms353/blob/master/Angiosperms353_targetSequences.fasta
+
+##convert multiline fasta to single line
+seqtk seq -l0 Angiosperms353_targetSequences.fasta > Angiosperms353_targetSequences.oneline.fasta
+
+
+##Nikolov targets obtained directly from Luke Nikolov - file name
+AT-reference-exons-Nikolv2019.fasta
+
+
+
+
+##############################################################################
+###Sample Set 1 informatic steps: (Set 2 and Set 3 applied the same scripts)##
+##############################################################################
+
+##working directory
+/media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS
+
+
+##Deduplication procedure
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HTStream_v1.3.0/hts_SuperDeduper -1 "$i"_L001_R1_001.fastq -2 "$i"_L001_R2_001.fastq -f $i -A stats.log
+done
+
+## decompressed the resulting *.gz files
+
+gzip -d *.gz
+
+##running trimmomatic v0.39 on the dedupicated reads
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+trimmomatic    PE  -phred33   "$i"_R1.fastq   "$i"_R2.fastq   $i.fastq_R1_paired.fq   $i.fastq_R1_unpaired.fq   $i.fastq_R2_paired.fq   $i.fastq_R2_unpaired.fq   ILLUMINACLIP:/Programs/Trimmomatic-0.36/adapters/TruSeq3-PE.fa:2:30:10   LEADING:3   TRAILING:3   SLIDINGWINDOW:4:15   MINLEN:50
+done
+
+
+##create list of sample names within file "namelist.txt" 
+PJA244_S6
+PJA248_S5
+PJA296A_S4
+PJA370-A_S1
+PJA370-B_S2
+PJA370-C_S3
+
+###################################
+####Angiopspers353 targets#########
+###################################
+
+######Running hybpiper with deduplicated paired-end data
+
+## run on reads_first.py 
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b /media/Scratch8TB/Donovan/PAFTOL/Angiosperms353_targetSequences.oneline.fasta -r "$i".fastq_R*_paired.fq --prefix $i --bwa
+done
+
+##calculate lengths
+
+python /Programs/HybPiper/get_seq_lengths.py ../../Angiosperms353_targetSequences.oneline.fasta namelist.txt dna > Angios353_seq_lengths.txt
+
+
+###calculate stats
+
+python /Programs/HybPiper/hybpiper_stats.py Angios353_seq_lengths.txt namelist.txt > Angios353_stats.txt
+
+
+
+
+##### Paired-end data without superdeduper...####### 
+
+## path - /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Angios353_no_dedup
+
+
+##trimmomatic
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+trimmomatic    PE  -phred33   "$i"_L001_R1_001.fastq   "$i"_L001_R2_001.fastq   $i.fastq_no_dedup_R1_paired.fq   $i.fastq_no_dedup_R1_unpaired.fq   $i.fastq_no_dedup_R2_paired.fq   $i.fastq_no_dedup_R2_unpaired.fq   ILLUMINACLIP:/Programs/Trimmomatic-0.36/adapters/TruSeq3-PE.fa:2:30:10   LEADING:3   TRAILING:3   SLIDINGWINDOW:4:15   MINLEN:50
+done
+
+
+##first_reads.py
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b /media/Scratch8TB/Donovan/PAFTOL/Angiosperms353_targetSequences.oneline.fasta -r $i.fastq_no_dedup_R*_paired.fq --prefix $i.no_dedup --bwa
+done
+
+##calculate lengths
+python /Programs/HybPiper/get_seq_lengths.py /media/Scratch8TB/Donovan/PAFTOL/Angiosperms353_targetSequences.oneline.fasta namelist.txt dna > Angios353_seq_lengths.txt
+
+## calculate stats
+python /Programs/HybPiper/hybpiper_stats.py Angios353_seq_lengths.txt namelist.txt > Angios353_stats.txt
+
+
+
+
+
+##### Paired-end data and single-end data, no deduplication##### 
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b /media/Scratch8TB/Donovan/PAFTOL/Angiosperms353_targetSequences.oneline.fasta -r /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Angios353_no_dedup/$i.fastq_no_dedup_R*_paired.fq --unpaired /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Angios353_no_dedup/$i.fastq_no_dedup_all_unpaired.fq  --prefix $i.all --bwa
+done
+
+##calculate lengths
+python /Programs/HybPiper/get_seq_lengths.py /media/Scratch8TB/Donovan/PAFTOL/Angiosperms353_targetSequences.oneline.fasta namelist.txt dna > Angios353_seq_lengths.txt
+
+## calcuate stats
+python /Programs/HybPiper/hybpiper_stats.py Angios353_seq_lengths.txt namelist.txt > Angios353_stats.txt
+
+
+
+
+
+#####################################
+#####REPEAT FOR NIKLOV BAITS FOR SET 1 data#####
+#####################################
+
+##working directory
+
+/media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Nikolov_baits
+
+
+##### Hybpiper run using dedupicated paired-end data  #####
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b AT-reference-exons-Nikolv2019.fasta -r "$i".fastq_R*_paired.fq --prefix $i --bwa
+done
+
+
+## calculate lengths
+python /Programs/HybPiper/get_seq_lengths.py AT-reference-exons-Nikolv2019.fasta namelist.txt dna > Luke_seq_lengths.txt
+
+## calculate stats
+python /Programs/HybPiper/hybpiper_stats.py Luke_seq_lengths.txt namelist.txt > Luke_stats.txt
+
+
+
+##### repeat with paired-end data without deduplication#####
+
+##reads_first.py
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b ../AT-reference-exons-Nikolv2019.fasta -r $i.fastq_no_dedup_R*_paired.fq --prefix $i --bwa
+done
+
+
+##calculate lenghts
+python /Programs/HybPiper/get_seq_lengths.py ../AT-reference-exons-Nikolv2019.fasta namelist.txt dna > Luke_seq_lengths.txt
+
+##calculate stats
+python /Programs/HybPiper/hybpiper_stats.py Luke_seq_lengths.txt namelist.txt > Luke_stats.txt
+
+
+
+#####repeat without deduplication but with PE and single-end reads
+
+##reads_first.py 
+
+for i in PJA244_S6 PJA248_S5 PJA296A_S4 PJA370-A_S1 PJA370-B_S2 PJA370-C_S3
+do
+/Programs/HybPiper/reads_first.py -b /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Nikolov_baits/AT-reference-exons-Nikolv2019.fasta -r /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Angios353_no_dedup/$i.fastq_no_dedup_R*_paired.fq --unpaired /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Angios353_no_dedup/$i.fastq_no_dedup_all_unpaired.fq  --prefix $i.all --bwa
+done
+
+
+##calculate lengths
+python /Programs/HybPiper/get_seq_lengths.py /media/Scratch8TB/Donovan/PAFTOL/Boechera_test/APPS_Paper_ANALYSIS/Nikolov_baits/AT-reference-exons-Nikolv2019.fasta namelist.txt dna > Luke_seq_lengths.txt
+
+##calculate stats
+python /Programs/HybPiper/hybpiper_stats.py Luke_seq_lengths.txt namelist.txt > Luke_stats.txt
+
+
